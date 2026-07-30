@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Sprint Velocity Tracker",
+  "schemaVersion": 1,
+  "description": "Sprint velocity tracker with sample data — 5 devs across a 10-day sprint with realistic scenarios: blockers, stale tickets, BA/PO queues, and per-dev burndown charts.",
+  "mcpTools": [],
+  "mcpServerNames": []
+}
+</script>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mid-Sprint Velocity Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+:root{color-scheme:light;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#111827;}
+:root{--color-border-tertiary:#e5e7eb;--color-border-secondary:#d1d5db;--color-background-primary:#ffffff;--color-background-secondary:#f9fafb;--color-text-primary:#111827;--color-text-secondary:#6b7280;--border-radius-lg:8px;}
+.vt{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;max-width:1100px;margin:20px auto;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.vt-hdr{background:#0f1e35;padding:12px 20px;}
+.vt-hdr-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.vt-hdr h1{color:#fff;font-size:15px;font-weight:500;margin:0;}
+.vt-hdr p{color:#94a3b8;font-size:11px;margin:2px 0 0;}
+.live-pill{background:#b45309;color:#fff;font-size:10px;font-weight:500;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.hdr-pills{display:flex;align-items:center;gap:6px;}
+.prog-wrap{display:flex;align-items:center;gap:10px;}
+.prog-lbl{color:#94a3b8;font-size:10px;white-space:nowrap;}
+.prog-track{flex:1;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;}
+.prog-fill{height:4px;background:#1a7a4a;border-radius:2px;}
+.vt-toggle{background:var(--color-background-secondary);border-bottom:0.5px solid var(--color-border-tertiary);padding:10px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.vt-btn{background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:6px;padding:5px 14px;font-size:12px;cursor:pointer;color:var(--color-text-secondary);}
+.vt-btn.on{background:#0f1e35;color:#fff;border-color:#0f1e35;}
+.vt-pto{background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);padding:9px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pto-lbl{font-size:11px;color:var(--color-text-secondary);flex-shrink:0;}
+.pc{font-size:10px;font-weight:500;padding:3px 7px;border-radius:6px;border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;user-select:none;}
+.pc.on{background:#fef3c7;color:#92400e;border-color:#fcd34d;}
+.sum-grid{display:grid;grid-template-columns:repeat(var(--dev-count,5),1fr);gap:1px;background:var(--color-border-tertiary);border-bottom:0.5px solid var(--color-border-tertiary);}
+.sum-cell{background:var(--color-background-primary);padding:10px 6px;text-align:center;}
+.sum-n{font-size:11px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px;}
+.sum-p{font-size:17px;font-weight:500;line-height:1;}
+.sum-b{font-size:9px;font-weight:500;padding:2px 6px;border-radius:10px;margin-top:4px;display:inline-block;}
+.cg{color:#1a7a4a;}.ca{color:#b45309;}.cr{color:#991b1b;}
+.bg{background:#dcfce7;color:#166534;}.ba{background:#fef3c7;color:#92400e;}.br{background:#fee2e2;color:#991b1b;}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 10px 0;}
+.mc{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;}
+.mc-hd{background:var(--color-background-secondary);border-bottom:0.5px solid var(--color-border-tertiary);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;}
+.mc-n{font-size:13px;font-weight:500;color:var(--color-text-primary);}
+.sb{font-size:10px;font-weight:500;padding:3px 9px;border-radius:20px;}
+.mc-stats{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:0.5px solid var(--color-border-tertiary);}
+.mcs{padding:7px 8px;text-align:center;border-right:0.5px solid var(--color-border-tertiary);}
+.mcs:last-child{border-right:none;}
+.mcs-l{font-size:9px;color:var(--color-text-secondary);display:block;margin-bottom:2px;}
+.mcs-v{font-size:15px;font-weight:500;color:var(--color-text-primary);line-height:1;}
+.mcs-s{font-size:9px;color:var(--color-text-secondary);display:block;margin-top:1px;}
+.mc-ch{padding:8px 10px 4px;height:140px;position:relative;}
+.mc-note{padding:4px 10px;font-size:9px;color:#94a3b8;font-style:italic;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);}
+.mc-insight{padding:7px 10px;border-top:0.5px solid var(--color-border-tertiary);font-size:10px;line-height:1.5;color:var(--color-text-secondary);background:var(--color-background-primary);}
+.pipe-section{padding:6px 10px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);}
+.pipe-lbl{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-secondary);margin-bottom:4px;}
+.pipe-row{display:flex;align-items:center;gap:3px;flex-wrap:wrap;}
+.pipe-chip{font-size:9px;font-weight:500;padding:2px 6px;border-radius:8px;white-space:nowrap;}
+.pipe-arr{font-size:10px;color:var(--color-text-secondary);}
+.pipe-flag{font-size:9px;font-weight:600;padding:2px 6px;border-radius:8px;background:#fee2e2;color:#991b1b;border:0.5px solid #fca5a5;}
+.p-gray{background:#f1f5f9;color:#374151;}.p-blue{background:#dbeafe;color:#1d4ed8;}.p-amber{background:#fef3c7;color:#92400e;}.p-purple{background:#ede9fe;color:#5b21b6;}.p-orange{background:#fff7ed;color:#c2410c;}.p-green{background:#dcfce7;color:#166534;}
+.snapshot-section{border-top:0.5px solid var(--color-border-tertiary);padding:12px 16px;background:var(--color-background-primary);margin:10px;}
+.snap-hdr{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.07em;color:var(--color-text-secondary);margin-bottom:9px;display:flex;align-items:center;gap:6px;}
+.snap-list{display:flex;flex-direction:column;gap:7px;}
+.snap-item{display:flex;gap:8px;align-items:flex-start;font-size:11px;line-height:1.5;}
+.snap-name{font-weight:500;color:var(--color-text-primary);flex-shrink:0;min-width:72px;}
+.snap-tag{font-size:9px;font-weight:500;padding:1px 6px;border-radius:6px;margin-left:4px;vertical-align:middle;white-space:nowrap;}
+.snap-text{color:var(--color-text-secondary);}
+.solo-wrap{padding:10px;}
+.sc{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;}
+.sc-hd{background:var(--color-background-secondary);border-bottom:0.5px solid var(--color-border-tertiary);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
+.sc-n{font-size:14px;font-weight:500;color:var(--color-text-primary);}
+.sc-m{font-size:11px;color:var(--color-text-secondary);margin-top:2px;}
+.sc-stats{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:0.5px solid var(--color-border-tertiary);}
+.scs{padding:10px 10px;text-align:center;border-right:0.5px solid var(--color-border-tertiary);}
+.scs:last-child{border-right:none;}
+.scs-l{font-size:9.5px;color:var(--color-text-secondary);display:block;margin-bottom:3px;}
+.scs-v{font-size:20px;font-weight:500;color:var(--color-text-primary);line-height:1;}
+.scs-s{font-size:9.5px;color:var(--color-text-secondary);display:block;margin-top:2px;}
+.sc-ch{padding:14px;height:235px;position:relative;}
+.sc-insight{padding:11px 16px;border-top:0.5px solid var(--color-border-tertiary);font-size:12px;line-height:1.6;color:var(--color-text-secondary);border-left:3px solid #0f1e35;background:var(--color-background-secondary);}
+.sc-pipe{padding:10px 16px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);}
+.sc-pipe-lbl{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-secondary);margin-bottom:6px;}
+.sc-pipe-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.sc-chip{font-size:10px;font-weight:500;padding:3px 9px;border-radius:10px;}
+.sc-flag{font-size:10px;font-weight:600;padding:3px 9px;border-radius:10px;background:#fee2e2;color:#991b1b;border:0.5px solid #fca5a5;}
+.leg-row{display:flex;gap:14px;padding:9px 16px;flex-wrap:wrap;border-top:0.5px solid var(--color-border-tertiary);}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary);}
+.ld{width:18px;border-top:2px dashed #1a7a4a;}
+.ls{width:18px;border-top:2.5px solid #0f1e35;}
+.ldot-t{width:9px;height:9px;border-radius:50%;background:#b45309;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px #b45309;flex-shrink:0;}
+.bdev-ok{background:#dbeafe;color:#1d4ed8;}.bdev-thin{background:#fff7ed;color:#c2410c;}.bdev-wait{background:#ede9fe;color:#5b21b6;}
+.mc-bapo-note{padding:5px 10px;font-size:9px;font-weight:500;color:#5b21b6;background:#faf5ff;border-top:0.5px solid #e9d5ff;}
+.sc-bapo-note{padding:9px 16px;font-size:11px;font-weight:500;color:#5b21b6;background:#faf5ff;border-top:0.5px solid #e9d5ff;border-left:3px solid #7c3aed;}
+.vt-foot{text-align:center;font-size:11px;color:var(--color-text-secondary);padding:9px;border-top:0.5px solid var(--color-border-tertiary);}
+.blocker-chip{font-size:9px;font-weight:500;padding:2px 7px;border-radius:8px;white-space:nowrap;background:#fef2f2;color:#b91c1c;border:0.5px solid #fca5a5;}
+.blocker-section-sm{padding:6px 10px;border-top:0.5px solid #fca5a5;background:#fff5f5;}
+.blocker-section-lg{padding:10px 16px;border-top:0.5px solid #fca5a5;background:#fff5f5;}
+.blocker-hdr-sm{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#b91c1c;margin-bottom:4px;}
+.blocker-hdr-lg{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#b91c1c;margin-bottom:6px;}
+.blocker-note{font-size:9px;color:#7f1d1d;margin-top:3px;line-height:1.4;font-style:italic;}
+.stale-chip{font-size:9px;font-weight:500;padding:2px 7px;border-radius:8px;white-space:nowrap;}
+.stale-amber{background:#fef3c7;color:#92400e;border:0.5px solid #fcd34d;}
+.stale-red{background:#fee2e2;color:#991b1b;border:0.5px solid #fca5a5;}
+.stale-section-sm{padding:6px 10px;border-top:0.5px solid #fca5a5;background:#fff8f8;}
+.stale-section-lg{padding:10px 16px;border-top:0.5px solid #fca5a5;background:#fff8f8;}
+.stale-hdr-sm{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#991b1b;margin-bottom:4px;}
+.stale-hdr-lg{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#991b1b;margin-bottom:6px;}
+.stale-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
+.sample-banner{background:#fef3c7;border-bottom:0.5px solid #fcd34d;padding:6px 20px;font-size:11px;color:#92400e;text-align:center;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── Sample Data ───────────────────────────────────────────────────────────
+const SPRINT_NAME = 'Sprint 42 · Jun 2–13, 2026';
+const START_STR   = '2026-06-02';
+const END_STR     = '2026-06-13';
+
+const SAMPLE_DEVS_RAW = [
+  {
+    name: 'Alex',
+    committed: 21,
+    completedPts: 14,
+    velBaselineLabel: '78% · 2-sprint avg',
+    velBaseline: 78,
+    pipeline: [
+      { stage: 'In Progress', count: 2, pts: 5, cls: 'p-blue' },
+      { stage: 'In Review',   count: 1, pts: 2, cls: 'p-amber' }
+    ],
+    workload: { actionablePts: 7, actionableCount: 3, bapoPts: 0, bapoCount: 0 },
+    staleTickets: [],
+    flaggedTickets: [],
+    mgrInsight: 'Alex is pacing well at 67% with two days left — on track to close out In Progress tickets before the sprint ends.',
+    devInsight: 'You\'re on track. Push the In Review ticket through today so it doesn\'t block your final two In Progress items.'
+  },
+  {
+    name: 'Jordan',
+    committed: 18,
+    completedPts: 8,
+    velBaselineLabel: '65% · 2-sprint avg',
+    velBaseline: 65,
+    pipeline: [
+      { stage: 'In Progress',       count: 1, pts: 3, cls: 'p-blue' },
+      { stage: 'Ready for Testing', count: 2, pts: 5, cls: 'p-purple', flag: 'UAT waiting' },
+      { stage: 'To Do',             count: 1, pts: 2, cls: 'p-gray' }
+    ],
+    workload: { actionablePts: 5, actionableCount: 2, bapoPts: 5, bapoCount: 2 },
+    staleTickets: [{ key: 'WEB-204', status: 'Ready for Testing', staleDays: 4, staleLevel: 'amber' }],
+    flaggedTickets: [],
+    mgrInsight: 'Jordan has 2 tickets stalled in Ready for Testing — BA/PO needs to action those. Developer-owned work is on pace.',
+    devInsight: 'Two tickets are waiting on BA/PO for testing — no action needed from you there. Focus on finishing the In Progress ticket and the remaining To Do.'
+  },
+  {
+    name: 'Sam',
+    committed: 24,
+    completedPts: 10,
+    velBaselineLabel: '72% · 1-sprint',
+    velBaseline: 72,
+    pipeline: [
+      { stage: 'In Progress', count: 3, pts: 8, cls: 'p-blue' },
+      { stage: 'In Review',   count: 2, pts: 6, cls: 'p-amber', flag: 'Review queue' }
+    ],
+    workload: { actionablePts: 14, actionableCount: 5, bapoPts: 0, bapoCount: 0 },
+    staleTickets: [{ key: 'WEB-211', status: 'In Review', staleDays: 4, staleLevel: 'red' }],
+    flaggedTickets: [{ key: 'WEB-208', status: 'In Progress', blockerNote: 'Blocked on API contract from backend team — waiting on WEB-199.' }],
+    mgrInsight: 'Sam is behind pace with 14pt remaining and a blocked ticket. The In Review queue needs attention from reviewers, and WEB-208 needs backend resolution.',
+    devInsight: 'You have a blocked ticket (WEB-208) — escalate the API contract dependency today. The review queue is backing up; nudge reviewers on the two In Review items.'
+  },
+  {
+    name: 'Morgan',
+    committed: 15,
+    completedPts: 13,
+    velBaselineLabel: '88% · 2-sprint avg',
+    velBaseline: 88,
+    pipeline: [
+      { stage: 'In Progress', count: 1, pts: 2, cls: 'p-blue' }
+    ],
+    workload: { actionablePts: 2, actionableCount: 1, bapoPts: 0, bapoCount: 0 },
+    staleTickets: [],
+    flaggedTickets: [],
+    mgrInsight: 'Morgan is the sprint\'s standout — 87% complete with one small ticket remaining. Ahead of pace.',
+    devInsight: 'You\'re way ahead — just finish the last 2-pointer. Consider picking up any unassigned tickets if bandwidth allows.'
+  },
+  {
+    name: 'Riley',
+    committed: 20,
+    completedPts: 9,
+    velBaselineLabel: '68% · 2-sprint avg',
+    velBaseline: 68,
+    pipeline: [
+      { stage: 'In Progress',  count: 2, pts: 6, cls: 'p-blue' },
+      { stage: 'Ready for UAT', count: 1, pts: 3, cls: 'p-orange', flag: 'UAT waiting' },
+      { stage: 'To Do',         count: 1, pts: 2, cls: 'p-gray' }
+    ],
+    workload: { actionablePts: 8, actionableCount: 3, bapoPts: 3, bapoCount: 1 },
+    staleTickets: [],
+    flaggedTickets: [],
+    mgrInsight: 'Riley is at 45% — slightly behind pace. One ticket is waiting on UAT; remaining dev-owned work should be achievable.',
+    devInsight: 'You\'re a bit behind. The UAT ticket is out of your hands — focus on closing the two In Progress items and the To Do before sprint end.'
+  }
+];
+
+// ── Config ────────────────────────────────────────────────────────────────
+const DONE_STATUSES = new Set(['Done','Closed','Ready to Deploy']);
+const BAPO_STATUSES = new Set(['Ready for Testing','Testing','Ready for UAT','Ready to Deploy']);
+const DEV_ACTIONABLE_STATUSES = new Set(['To Do','In Progress','In Review']);
+
+let DAYS_ARR=[], DAYS_LABELS=[], TODAY_IDX=0, ND=0;
+let ptoDaysMgr=new Set(), ptoDaysIndiv=new Set();
+let ptoDays=ptoDaysMgr;
+
+function buildWorkingDays(startStr, endStr) {
+  const days=[], labels=[];
+  const d = new Date(startStr+'T00:00:00');
+  const e = new Date(endStr+'T00:00:00');
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  while (d<=e) {
+    const wd=d.getDay();
+    if (wd&&wd<6){ days.push(new Date(d)); labels.push(months[d.getMonth()]+' '+d.getDate()); }
+    d.setDate(d.getDate()+1);
+  }
+  return {days,labels};
+}
+
+function todayIdx(days) {
+  const t=new Date(); t.setHours(0,0,0,0);
+  for (let i=days.length-1;i>=0;i--) {
+    const dd=new Date(days[i]); dd.setHours(0,0,0,0);
+    if (dd<=t) return i;
+  }
+  return 0;
+}
+
+function wdFrom(day){let c=0;for(let d=day;d<=ND;d++)if(!ptoDays.has(d))c++;return c;}
+
+function calcIdeal(committed, adds=[]) {
+  const line=[committed];
+  for (let i=1;i<=ND;i++){
+    let prev=line[i-1];
+    const add=adds.find(a=>a.day_idx===i);
+    if(add) prev+=add.pts;
+    if(ptoDays.has(i)){line.push(Math.round(prev*10)/10);}
+    else{const wd=wdFrom(i);const rate=wd>0?prev/wd:0;line.push(Math.max(0,Math.round((prev-rate)*10)/10));}
+  }
+  return line;
+}
+
+function getStatus(actualRem, idealRem) {
+  const g=actualRem-idealRem;
+  if(g<=-0.5) return {lbl:'↑ Ahead',  bg:'bg',fg:'cg'};
+  if(g<=2)    return {lbl:'✓ On track',bg:'bg',fg:'cg'};
+  if(g<=5)    return {lbl:'◎ Watch',  bg:'ba',fg:'ca'};
+  return             {lbl:'↻ Needs pivot',bg:'br',fg:'cr'};
+}
+
+function getDevRunwayBadge(ws) {
+  if(!ws) return {lbl:'✓ Dev runway clear',cls:'bdev-ok'};
+  if(ws.actionableCount===0&&ws.bapoCount>0) return {lbl:'⏳ In BA/PO queue',cls:'bdev-wait'};
+  if(ws.actionablePts<=2&&ws.bapoPts>ws.actionablePts) return {lbl:'◎ Runway thinning',cls:'bdev-thin'};
+  return {lbl:'✓ Dev runway clear',cls:'bdev-ok'};
+}
+
+function pipeHtml(pipeline, small) {
+  const cc=small?'pipe-chip':'sc-chip', fc=small?'pipe-flag':'sc-flag';
+  return pipeline.map((p,i)=>
+    (i>0?'<span class="pipe-arr">→</span>':'')+
+    `<span class="${cc} ${p.cls}">${p.stage} · ${p.count}t · ${p.pts}pt</span>`+
+    (p.flag?`<span class="${fc}">∨ ${p.flag}</span>`:'')
+  ).join('');
+}
+
+function staleSectionHtml(staleTickets, small) {
+  if(!staleTickets||!staleTickets.length) return '';
+  const chips=staleTickets.map(t=>{
+    const lvl=t.staleLevel==='red'?'stale-red':'stale-amber';
+    return `<span class="stale-chip ${lvl}">${t.key} · ${t.status} · ${t.staleDays}d idle</span>`;
+  }).join('');
+  if(small) return `<div class="stale-section-sm"><div class="stale-hdr-sm">⚠ Stale tickets</div><div class="stale-row">${chips}</div></div>`;
+  return `<div class="stale-section-lg"><div class="stale-hdr-lg">⚠ Stale tickets — needs follow-up</div><div class="stale-row">${chips}</div></div>`;
+}
+
+function blockerSectionHtml(flaggedTickets, small) {
+  if(!flaggedTickets||!flaggedTickets.length) return '';
+  const items=flaggedTickets.map(t=>{
+    const note=t.blockerNote||'';
+    const short=note.length>80?note.slice(0,80)+'…':note;
+    if(small) return `<div style="margin-bottom:3px;"><span class="blocker-chip">${t.key} · ${t.status}</span>${short?`<div class="blocker-note">${short}</div>`:''}</div>`;
+    return `<div style="margin-bottom:5px;"><span class="blocker-chip">${t.key} · ${t.status}</span>${note?`<div class="blocker-note">${note}</div>`:''}</div>`;
+  }).join('');
+  if(small) return `<div class="blocker-section-sm"><div class="blocker-hdr-sm">🚩 Blocked</div>${items}</div>`;
+  return `<div class="blocker-section-lg"><div class="blocker-hdr-lg">🚩 Blocked — needs attention</div>${items}</div>`;
+}
+
+let miniCh={}, soloCh=null, curView='mgr';
+let DEVS={}, DK=[];
+
+function mkChart(id, d, small) {
+  const ideal=calcIdeal(d.committed, d.adds||[]);
+  const actual=new Array(ND+1).fill(null);
+  actual[0]=d.committed;
+  if(TODAY_IDX>0) actual[TODAY_IDX]=d.remainingPts;
+  else actual[0]=d.remainingPts;
+  const pR=actual.map((v,i)=>v!==null?(i===TODAY_IDX?6:2):0);
+  const pC=actual.map((_,i)=>i===TODAY_IDX?'#b45309':'rgba(15,30,53,0.4)');
+  const c=document.getElementById(id); if(!c) return null;
+  return new Chart(c.getContext('2d'),{
+    type:'line',
+    data:{labels:DAYS_LABELS,datasets:[
+      {label:'Target',data:ideal,borderColor:'#1a7a4a',borderWidth:small?1.5:2,borderDash:[5,3],pointRadius:0,tension:0.1,fill:false},
+      {label:'Actual',data:actual,borderColor:'#0f1e35',backgroundColor:'rgba(15,30,53,0.05)',borderWidth:small?2:2.5,pointRadius:pR,pointBackgroundColor:pC,tension:0.1,fill:false,spanGaps:true}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        label:c=>`${c.dataset.label}: ${c.parsed.y!==null?c.parsed.y+'pt':'—'}`,
+        title:ts=>ts[0].dataIndex===TODAY_IDX?`${DAYS_LABELS[ts[0].dataIndex]} (Today)`:DAYS_LABELS[ts[0].dataIndex]
+      }}},
+      scales:{
+        x:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:small?8:10},color:'#6b7280',maxTicksLimit:small?6:11},border:{display:false}},
+        y:{grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:small?8:10},color:'#6b7280'},min:0,border:{display:false},title:{display:!small,text:'Pts remaining',font:{size:9},color:'#9ca3af'}}
+      },
+      interaction:{intersect:false,mode:'index'}
+    }
+  });
+}
+
+function renderMgr() {
+  const ideals={};
+  DK.forEach(k=>{ideals[k]=calcIdeal(DEVS[k].committed,DEVS[k].adds)[TODAY_IDX];});
+
+  document.getElementById('sumGrid').innerHTML=DK.map(k=>{
+    const d=DEVS[k], st=getStatus(d.remainingPts,ideals[k]);
+    const rw=getDevRunwayBadge(d.workload);
+    const donePct=d.committed>0?Math.round(d.completedPts/d.committed*100):0;
+    const bapoBadge=d.workload&&d.workload.bapoCount>0?`<span class="sum-b bdev-wait" style="margin-left:2px;">${d.workload.bapoCount} w/ BA/PO</span>`:'';
+    const hasRedStale=d.staleTickets&&d.staleTickets.some(t=>t.staleLevel==='red');
+    const hasStale=d.staleTickets&&d.staleTickets.length>0;
+    const staleBadge=hasRedStale?`<span class="sum-b stale-red" style="margin-left:2px;">⚠ ${d.staleTickets.length} stale</span>`:hasStale?`<span class="sum-b stale-amber" style="margin-left:2px;">⚠ ${d.staleTickets.length} stale</span>`:'';
+    const blockerBadge=d.flaggedTickets&&d.flaggedTickets.length>0?`<span class="sum-b" style="background:#fef2f2;color:#b91c1c;border:0.5px solid #fca5a5;margin-left:2px;">🚩 ${d.flaggedTickets.length} blocked</span>`:'';
+    return `<div class="sum-cell">
+      <div class="sum-n">${d.name}</div>
+      <div class="sum-p ${st.fg}">${donePct}%<span style="font-size:10px;"> done</span></div>
+      <span class="sum-b ${st.bg}">${st.lbl}</span>
+      <div style="margin-top:4px;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;">
+        <span class="sum-b ${rw.cls}">${rw.lbl}</span>${bapoBadge}${staleBadge}${blockerBadge}
+      </div>
+    </div>`;
+  }).join('');
+
+  Object.values(miniCh).forEach(c=>c&&c.destroy()); miniCh={};
+  document.getElementById('cardsGrid').innerHTML=DK.map(k=>{
+    const d=DEVS[k], st=getStatus(d.remainingPts,ideals[k]);
+    const rw=getDevRunwayBadge(d.workload);
+    const donePct=d.committed>0?Math.round(d.completedPts/d.committed*100):0;
+    const bapoNote=d.workload&&d.workload.bapoCount>0?`<div class="mc-bapo-note">⏳ ${d.workload.bapoCount} ticket${d.workload.bapoCount>1?'s':''} (${d.workload.bapoPts}pt) awaiting BA/PO action</div>`:'';
+    return `<div class="mc">
+      <div class="mc-hd">
+        <span class="mc-n">${d.name}</span>
+        <div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          <span class="sb ${st.bg}">${st.lbl}</span>
+          <span class="sb ${rw.cls}">${rw.lbl}</span>
+        </div>
+      </div>
+      <div class="mc-stats">
+        <div class="mcs"><span class="mcs-l">Committed</span><div class="mcs-v">${d.committed}pt</div><span class="mcs-s">sprint total</span></div>
+        <div class="mcs"><span class="mcs-l">Remaining</span><div class="mcs-v">${d.remainingPts}pt</div><span class="mcs-s">${donePct}% done</span></div>
+        <div class="mcs"><span class="mcs-l">Baseline vel.</span><div class="mcs-v">${d.velBaselineLabel}</div><span class="mcs-s">weighted avg</span></div>
+      </div>
+      <div class="mc-ch"><canvas id="mc-${k}"></canvas></div>
+      ${bapoNote}
+      <div class="mc-note">● Sample data mode</div>
+      <div class="mc-insight">${d.mgrInsight}</div>
+      <div class="pipe-section"><div class="pipe-lbl">Pipeline</div><div class="pipe-row">${pipeHtml(d.pipeline,true)}</div></div>
+      ${staleSectionHtml(d.staleTickets||[], true)}
+      ${blockerSectionHtml(d.flaggedTickets||[], true)}
+    </div>`;
+  }).join('');
+
+  document.getElementById('snapList').innerHTML=DK.map(k=>{
+    const d=DEVS[k], st=getStatus(d.remainingPts,ideals[k]);
+    return `<div class="snap-item"><span class="snap-name">${d.name}<span class="snap-tag ${st.bg}">${st.lbl}</span></span><span class="snap-text">${d.mgrInsight}</span></div>`;
+  }).join('');
+
+  setTimeout(()=>{DK.forEach(k=>{miniCh[k]=mkChart(`mc-${k}`,DEVS[k],true);});},60);
+}
+
+function renderSolo() {
+  const k=document.getElementById('devPick').value, d=DEVS[k];
+  const ideals=calcIdeal(d.committed,d.adds), ideal_t=ideals[TODAY_IDX];
+  const st=getStatus(d.remainingPts,ideal_t);
+  const rw=getDevRunwayBadge(d.workload);
+  const donePct=d.committed>0?Math.round(d.completedPts/d.committed*100):0;
+  document.getElementById('scName').textContent=d.name;
+  const badge=document.getElementById('scBadge'); badge.textContent=st.lbl; badge.className=`sb ${st.bg}`;
+  const devBadge=document.getElementById('scDevBadge');
+  if(devBadge){devBadge.textContent=rw.lbl;devBadge.className=`sb ${rw.cls}`;}
+  const bapoNote=document.getElementById('scBapoNote');
+  if(bapoNote){
+    if(d.workload&&d.workload.bapoCount>0){
+      bapoNote.textContent=`⏳ ${d.workload.bapoCount} ticket${d.workload.bapoCount>1?'s':''} (${d.workload.bapoPts}pt) are currently with BA/PO — no action needed from you on those right now.`;
+      bapoNote.style.display='block';
+    } else { bapoNote.style.display='none'; }
+  }
+  document.getElementById('scStats').innerHTML=`
+    <div class="scs"><span class="scs-l">Committed</span><div class="scs-v">${d.committed}pt</div><span class="scs-s">sprint total</span></div>
+    <div class="scs"><span class="scs-l">Completed</span><div class="scs-v ${d.completedPts>0?'cg':''}">${d.completedPts}pt</div><span class="scs-s">${donePct}% done</span></div>
+    <div class="scs"><span class="scs-l">Remaining</span><div class="scs-v">${d.remainingPts}pt</div><span class="scs-s">to reach 100%</span></div>
+    <div class="scs"><span class="scs-l">Baseline vel.</span><div class="scs-v">${d.velBaselineLabel}</div><span class="scs-s">rolling avg</span></div>
+    <div class="scs"><span class="scs-l">Target today</span><div class="scs-v">${Math.round(ideal_t*10)/10}pt</div><span class="scs-s">ideal remaining</span></div>`;
+  document.getElementById('scInsight').textContent=d.devInsight||'';
+  document.getElementById('scPipe').innerHTML=pipeHtml(d.pipeline,false);
+  const scStaleEl=document.getElementById('scStale');
+  if(scStaleEl) scStaleEl.outerHTML=`<div id="scStale">${staleSectionHtml(d.staleTickets||[],false)}</div>`;
+  const scBlockersEl=document.getElementById('scBlockers');
+  if(scBlockersEl) scBlockersEl.outerHTML=`<div id="scBlockers">${blockerSectionHtml(d.flaggedTickets||[],false)}</div>`;
+  if(soloCh){soloCh.destroy();soloCh=null;}
+  setTimeout(()=>{soloCh=mkChart('soloC',d,false);},30);
+}
+
+function syncPtoButtons() {
+  document.querySelectorAll('#ptoRow .pc').forEach((btn,i)=>{
+    btn.classList.toggle('on',ptoDays.has(i));
+  });
+}
+function switchDev(){ptoDaysIndiv.clear();syncPtoButtons();renderSolo();}
+function setView(v){
+  curView=v;
+  if(v==='mgr'){ptoDays=ptoDaysMgr;}else{ptoDaysIndiv.clear();ptoDays=ptoDaysIndiv;}
+  syncPtoButtons();
+  document.getElementById('btnMgr').className='vt-btn'+(v==='mgr'?' on':'');
+  document.getElementById('btnInd').className='vt-btn'+(v==='ind'?' on':'');
+  document.getElementById('devWrap').style.display=v==='ind'?'block':'none';
+  document.getElementById('mgrView').style.display=v==='mgr'?'block':'none';
+  document.getElementById('indView').style.display=v==='ind'?'block':'none';
+  if(v==='mgr')renderMgr();else renderSolo();
+}
+function rerender(){if(curView==='mgr')renderMgr();else renderSolo();}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(function init(){
+  const {days,labels}=buildWorkingDays(START_STR,END_STR);
+  DAYS_ARR=days; DAYS_LABELS=labels; ND=labels.length-1; TODAY_IDX=todayIdx(days);
+
+  DEVS={}; DK=[];
+  for (const raw of SAMPLE_DEVS_RAW) {
+    const key=raw.name.toLowerCase();
+    DK.push(key);
+    DEVS[key]={
+      name:raw.name, fullName:raw.name,
+      committed:raw.committed, completedPts:raw.completedPts,
+      remainingPts:raw.committed-raw.completedPts,
+      adds:[], pipeline:raw.pipeline,
+      workload:raw.workload, staleTickets:raw.staleTickets,
+      flaggedTickets:raw.flaggedTickets,
+      velBaseline:raw.velBaseline, velBaselineLabel:raw.velBaselineLabel,
+      mgrInsight:raw.mgrInsight, devInsight:raw.devInsight
+    };
+  }
+
+  const now=new Date();
+  const nowStr=now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const dayNum=TODAY_IDX+1;
+  const totalPts=SAMPLE_DEVS_RAW.reduce((s,d)=>s+d.committed,0);
+
+  document.getElementById('app').innerHTML=`
+  <div class="vt" style="--dev-count:${DK.length};">
+    <div class="sample-banner">⚠ Sample data — connect Jira to see live sprint data</div>
+    <div class="vt-hdr">
+      <div class="vt-hdr-top">
+        <div>
+          <h1>Mid-sprint velocity tracker</h1>
+          <p>${SPRINT_NAME} · E-Commerce Engineering Team · Sample data</p>
+        </div>
+        <div class="hdr-pills">
+          <span class="live-pill">● Sample</span>
+        </div>
+      </div>
+      <div class="prog-wrap">
+        <span class="prog-lbl">Day ${dayNum} of ${ND+1}</span>
+        <div class="prog-track"><div class="prog-fill" style="width:${Math.round(dayNum/(ND+1)*100)}%;"></div></div>
+        <span class="prog-lbl">${START_STR} → ${END_STR} · ${totalPts} pts committed</span>
+      </div>
+    </div>
+
+    <div class="vt-toggle">
+      <button class="vt-btn on" id="btnMgr" onclick="setView('mgr')">Manager view</button>
+      <button class="vt-btn" id="btnInd" onclick="setView('ind')">My view</button>
+      <div id="devWrap" style="display:none;margin-left:4px;">
+        <select id="devPick" onchange="switchDev()"></select>
+      </div>
+    </div>
+
+    <div class="vt-pto">
+      <span class="pto-lbl">PTO days (click to toggle — adjusts target pace):</span>
+      <div id="ptoRow" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+    </div>
+
+    <div id="mgrView">
+      <div class="sum-grid" id="sumGrid"></div>
+      <div class="cards" id="cardsGrid"></div>
+      <div style="padding:0 10px 10px;">
+        <div class="snapshot-section" style="margin:0;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);">
+          <div class="snap-hdr">⚡ Sprint snapshot</div>
+          <div class="snap-list" id="snapList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="indView" style="display:none;">
+      <div class="solo-wrap">
+        <div class="sc">
+          <div class="sc-hd">
+            <div>
+              <div class="sc-n" id="scName"></div>
+              <div class="sc-m">${SPRINT_NAME} · ${START_STR} → ${END_STR} · Day ${dayNum} of ${ND+1}</div>
+            </div>
+            <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+              <span class="sb" id="scBadge"></span>
+              <span class="sb" id="scDevBadge"></span>
+            </div>
+          </div>
+          <div class="sc-stats" id="scStats"></div>
+          <div class="sc-ch"><canvas id="soloC"></canvas></div>
+          <div class="sc-insight" id="scInsight"></div>
+          <div class="sc-bapo-note" id="scBapoNote" style="display:none;"></div>
+          <div class="sc-pipe">
+            <div class="sc-pipe-lbl">Current pipeline</div>
+            <div class="sc-pipe-row" id="scPipe"></div>
+          </div>
+          <div id="scStale"></div>
+          <div id="scBlockers"></div>
+          <div class="leg-row">
+            <div class="leg"><div class="ld"></div>Target pace (100%)</div>
+            <div class="leg"><div class="ldot-t"></div>Today (Day ${dayNum})</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="vt-foot">Sample data · ${nowStr} · Connect Jira to go live</div>
+  </div>`;
+
+  // PTO buttons
+  const pr=document.getElementById('ptoRow');
+  DAYS_LABELS.forEach((lbl,i)=>{
+    const s=document.createElement('span');
+    s.className='pc'; s.textContent=lbl;
+    s.onclick=()=>{ptoDays.has(i)?(ptoDays.delete(i),s.classList.remove('on')):(ptoDays.add(i),s.classList.add('on'));rerender();};
+    pr.appendChild(s);
+  });
+
+  // Dev picker
+  const dp=document.getElementById('devPick');
+  DK.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=DEVS[k].name;dp.appendChild(o);});
+
+  setView('mgr');
+})();
+</script>
+</body>
+</html>
